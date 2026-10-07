@@ -151,10 +151,10 @@ function calcAETR(shifts7) {
   }
 
   const alerts = []
-  if (weekDrive > 56*60) alerts.push({ lvl: 'err', msg: `Týdenní řízení ${fmtDur(weekDrive)} > 56h` })
-  else if (weekDrive > 50*60) alerts.push({ lvl: 'warn', msg: `Týdenní řízení ${fmtDur(weekDrive)} blíží se 56h` })
-  if (contDriveMax > 4.5*60) alerts.push({ lvl: 'err', msg: `Nepřetržité řízení ${fmtDur(contDriveMax)} > 4,5h` })
-  if (lastRestDur < 11*60 && lastRestDur > 0) alerts.push({ lvl: 'warn', msg: `Denní odpočinek ${fmtDur(lastRestDur)} < 11h` })
+  if (weekDrive > 56*60) alerts.push({ lvl: 'err', type: 'drive', msg: `Týdenní řízení ${fmtDur(weekDrive)} > 56h` })
+  else if (weekDrive > 50*60) alerts.push({ lvl: 'warn', type: 'drive', msg: `Týdenní řízení ${fmtDur(weekDrive)} blíží se 56h` })
+  if (contDriveMax > 4.5*60) alerts.push({ lvl: 'err', type: 'drive', msg: `Nepřetržité řízení ${fmtDur(contDriveMax)} > 4,5h` })
+  if (lastRestDur < 11*60 && lastRestDur > 0) alerts.push({ lvl: 'warn', type: 'rest', msg: `Denní odpočinek ${fmtDur(lastRestDur)} < 11h` })
 
   return {
     weekDrive, weekWork, contDriveMax,
@@ -340,7 +340,7 @@ function WeekView({ shifts, weekStart, onDayClick }) {
               </div>
             )}
             {m && m.drive > 9*60 && (
-              <div style={{ color:'#EF4444', fontSize:12, marginTop:4 }}>⚠️ Řízení překračuje 9h</div>
+              <div style={{ color:'#EF4444', fontSize:12, marginTop:4, display:'flex', alignItems:'center', gap:4 }}>⚠️ <IconDrive size={13} color="#EF4444"/> Řízení překračuje 9h</div>
             )}
           </div>
         )
@@ -361,13 +361,13 @@ function AETRDash({ shifts }) {
       <div style={{ fontWeight:700, marginBottom:12 }}>📊 Přehled AETR (posl. 7 dní)</div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
         {[
-          ['Týdenní řízení', fmtDur(aetr.weekDrive), '/ 56h', aetr.weekDrive > 50*60 ? '#EF4444' : '#10B981'],
-          ['Max. nepřetržité', fmtDur(aetr.contDriveMax), '/ 4,5h', aetr.contDriveMax > 4*60 ? '#F59E0B' : '#10B981'],
-          ['Zbývá řídit', fmtDur(aetr.driveLeft), 'tento týden', '#60A5FA'],
-          ['Týdenní práce', fmtDur(aetr.weekWork), 'celkem', '#8B5CF6'],
-        ].map(([l,v,s,c]) => (
+          ['Týdenní řízení', fmtDur(aetr.weekDrive), '/ 56h', aetr.weekDrive > 50*60 ? '#EF4444' : '#10B981', IconDrive],
+          ['Max. nepřetržité', fmtDur(aetr.contDriveMax), '/ 4,5h', aetr.contDriveMax > 4*60 ? '#F59E0B' : '#10B981', IconDrive],
+          ['Zbývá řídit', fmtDur(aetr.driveLeft), 'tento týden', '#60A5FA', IconDrive],
+          ['Týdenní práce', fmtDur(aetr.weekWork), 'celkem', '#8B5CF6', IconWork],
+        ].map(([l,v,s,c,Icon]) => (
           <div key={l} style={{ background:'#0F172A', borderRadius:10, padding:'10px 12px' }}>
-            <div style={{ fontSize:11, color:'#64748B' }}>{l}</div>
+            <div style={{ fontSize:11, color:'#64748B', display:'flex', alignItems:'center', gap:4 }}><Icon size={13} color="#64748B"/> {l}</div>
             <div style={{ fontSize:18, fontWeight:700, color:c }}>{v}</div>
             <div style={{ fontSize:11, color:'#475569' }}>{s}</div>
           </div>
@@ -376,7 +376,7 @@ function AETRDash({ shifts }) {
       {/* Progress bar */}
       <div style={{ marginBottom: aetr.alerts.length?12:0 }}>
         <div style={{ ...S.row, justifyContent:'space-between', marginBottom:4 }}>
-          <div style={{ fontSize:12, color:'#94A3B8' }}>Týdenní řízení</div>
+          <div style={{ fontSize:12, color:'#94A3B8', display:'flex', alignItems:'center', gap:4 }}><IconDrive size={13} color="#94A3B8"/> Týdenní řízení</div>
           <div style={{ fontSize:12, color:'#94A3B8' }}>{weekPct}%</div>
         </div>
         <div style={{ background:'#0F172A', borderRadius:4, height:8, overflow:'hidden' }}>
@@ -384,8 +384,8 @@ function AETRDash({ shifts }) {
         </div>
       </div>
       {aetr.alerts.map((a,i) => (
-        <div key={i} style={{ background: a.lvl==='err'?'#EF444422':'#F59E0B22', border:`1px solid ${a.lvl==='err'?'#EF4444':'#F59E0B'}44`, borderRadius:8, padding:'8px 12px', marginBottom:6, fontSize:13, color: a.lvl==='err'?'#FCA5A5':'#FCD34D' }}>
-          {a.lvl==='err'?'🔴':'🟡'} {a.msg}
+        <div key={i} style={{ background: a.lvl==='err'?'#EF444422':'#F59E0B22', border:`1px solid ${a.lvl==='err'?'#EF4444':'#F59E0B'}44`, borderRadius:8, padding:'8px 12px', marginBottom:6, fontSize:13, display:'flex', alignItems:'center', gap:6, color: a.lvl==='err'?'#FCA5A5':'#FCD34D' }}>
+          {a.lvl==='err'?'🔴':'🟡'} {TACHO_ICON[a.type]?.(13, a.lvl==='err'?'#FCA5A5':'#FCD34D')} {a.msg}
         </div>
       ))}
     </div>
