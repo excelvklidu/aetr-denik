@@ -1,9 +1,67 @@
-// AETR Deník v1.2 – localStorage (bez přihlášení)
+// AETR Deník v1.3 – localStorage (bez přihlášení) + tachograph SVG icons
 import { useState, useEffect } from 'react'
 
+// ─── TACHOGRAPH SVG ICONS (EU Reg. 561/2006) ─────────────────────────────────
+function IconDrive({ size=20, color='currentColor' }) {
+  // Steering wheel: outer ring + inner half-circle + center dot
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="2.5" fill={color} stroke="none" />
+      <path d="M12 9.5 A4.5 4.5 0 0 0 7.5 12" />
+      <path d="M12 9.5 A4.5 4.5 0 0 1 16.5 12" />
+      <line x1="12" y1="14.5" x2="12" y2="21" />
+    </svg>
+  )
+}
+
+function IconWork({ size=20, color='currentColor' }) {
+  // Two crossed hammers (like the image)
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <path d="M3 3 L8 8 L6.5 9.5 L9.5 12.5 L11 11 L13 13 L11.5 14.5 L14.5 17.5 L16 16 L21 21 L19 21 L14.5 16.5 L13 18 L10 15 L11.5 13.5 L8.5 10.5 L7 12 L4 9 L5.5 7.5 L3 5 Z" />
+      <path d="M21 3 L16 8 L17.5 9.5 L14.5 12.5 L13 11 L11 13 L12.5 14.5 L9.5 17.5 L8 16 L3 21 L5 21 L9.5 16.5 L11 18 L14 15 L12.5 13.5 L15.5 10.5 L17 12 L20 9 L18.5 7.5 L21 5 Z" />
+    </svg>
+  )
+}
+
+function IconRest({ size=20, color='currentColor' }) {
+  // Bed / rest symbol (like the image: horizontal bar with vertical legs)
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round">
+      <line x1="4" y1="8" x2="4" y2="17" />
+      <line x1="20" y1="8" x2="20" y2="17" />
+      <line x1="4" y1="13" x2="20" y2="13" />
+    </svg>
+  )
+}
+
+function IconPOA({ size=20, color='currentColor' }) {
+  // Square with diagonal line (like the image)
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round">
+      <rect x="3" y="3" width="18" height="18" rx="1" />
+      <line x1="3" y1="21" x2="21" y2="3" />
+    </svg>
+  )
+}
+
+// SVG icon component lookup
+const TACHO_ICON = {
+  drive:     (s,c) => <IconDrive size={s} color={c} />,
+  break:     (s,c) => <IconRest size={s} color={c} />,
+  rest:      (s,c) => <IconRest size={s} color={c} />,
+  available: (s,c) => <IconPOA size={s} color={c} />,
+  load:      (s,c) => <IconWork size={s} color={c} />,
+  unload:    (s,c) => <IconWork size={s} color={c} />,
+  fuel:      (s,c) => <IconWork size={s} color={c} />,
+  other:     (s,c) => <IconWork size={s} color={c} />,
+  vehicle:   (s,c) => <IconPOA size={s} color={c} />,
+  sick:      (s,c) => <span style={{fontSize:s*0.8}}>✕</span>,
+  vacation:  (s,c) => <span style={{fontSize:s*0.8}}>○</span>,
+}
+
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
-// Tachograph symbols per EU standard 561/2006:
-// 🚗 = Driving (steering wheel)  ⚒ = Work (hammer & pick)  🛏 = Rest/Break (bed)  ⧄ = POA/Availability (diag. square)
 const ACT = {
   drive:    { label: 'Řízení',           icon: '🚗', color: '#3B82F6', sym: '🚗', tacho: true  },
   break:    { label: 'Přestávka',        icon: '🛏', color: '#F59E0B', sym: '🛏', tacho: true  },
@@ -181,10 +239,19 @@ function ShiftModal({ date, shift, onSave, onClose }) {
 
         {/* Metrics */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:6, marginBottom:16 }}>
-          {[['🚗 Řízení','drive',m.drive],['⚒ Práce','work',m.work],['🛏 Odp.','rest',m.rest],['🛏 Přest.','pause',m.pause],['⧄ POA','poa',m.poa]].map(([l,,v])=>(
+          {[
+            ['Řízení','drive',m.drive,'#3B82F6'],
+            ['Práce','work',m.work,'#8B5CF6'],
+            ['Odp.','rest',m.rest,'#10B981'],
+            ['Přest.','pause',m.pause,'#F59E0B'],
+            ['POA','poa',m.poa,'#64748B']
+          ].map(([l,k,v,c])=>(
             <div key={l} style={{ background:'#0F172A', borderRadius:8, padding:'8px 6px', textAlign:'center' }}>
-              <div style={{ fontSize:11, color:'#64748B' }}>{l}</div>
-              <div style={{ fontSize:14, fontWeight:700, color:'#60A5FA' }}>{fmtDur(v)}</div>
+              <div style={{ display:'flex', justifyContent:'center', marginBottom:3 }}>
+                {k==='work' ? <IconWork size={16} color={c}/> : k==='poa' ? <IconPOA size={16} color={c}/> : k==='rest'||k==='pause' ? <IconRest size={16} color={c}/> : <IconDrive size={16} color={c}/>}
+              </div>
+              <div style={{ fontSize:10, color:'#64748B' }}>{l}</div>
+              <div style={{ fontSize:13, fontWeight:700, color:c }}>{fmtDur(v)}</div>
             </div>
           ))}
         </div>
@@ -193,7 +260,7 @@ function ShiftModal({ date, shift, onSave, onClose }) {
         <div style={{ marginBottom:12 }}>
           {acts.map(a => (
             <div key={a.id} style={{ ...S.row, background:'#0F172A', borderRadius:8, padding:'8px 10px', marginBottom:6 }}>
-              <span style={{ fontSize:18 }}>{ACT[a.type]?.icon}</span>
+              <span style={{ display:'flex', alignItems:'center' }}>{TACHO_ICON[a.type] ? TACHO_ICON[a.type](20, ACT[a.type]?.color||'#fff') : ACT[a.type]?.icon}</span>
               <span style={{ flex:1, fontSize:13 }}>{ACT[a.type]?.label}</span>
               <span style={{ color:'#94A3B8', fontSize:13 }}>{fmtTime(a.start)}–{fmtTime(a.end)}</span>
               <span style={{ color:'#60A5FA', fontSize:12, marginLeft:8 }}>{fmtDur(a.end-a.start)}</span>
@@ -255,15 +322,15 @@ function WeekView({ shifts, weekStart, onDayClick }) {
               {shift?.vehicle_reg && <span style={S.tag('#8B5CF6')}>{shift.vehicle_reg}</span>}
               {shift?.cycle_type === 'out' && <span style={S.tag('#F59E0B')}>OUT</span>}
               {shift?.cycle_type === 'bus' && <span style={S.tag('#06B6D4')}>BUS</span>}
-              <div style={{ marginLeft:'auto', color:'#64748B', fontSize:13 }}>
-                {m ? `🚗 ${fmtDur(m.drive)}` : '—'}
+              <div style={{ marginLeft:'auto', color:'#64748B', fontSize:13, display:'flex', alignItems:'center', gap:4 }}>
+                {m ? <><IconDrive size={14} color="#64748B"/> {fmtDur(m.drive)}</> : '—'}
               </div>
             </div>
             {m && (
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {(shift.activities||[]).map((a,i) => (
-                  <span key={i} style={{ ...S.tag(ACT[a.type]?.color||'#666'), fontSize:11 }}>
-                    {ACT[a.type]?.icon} {fmtDur(a.end-a.start)}
+                  <span key={i} style={{ ...S.tag(ACT[a.type]?.color||'#666'), fontSize:11, display:'flex', alignItems:'center', gap:3 }}>
+                    {TACHO_ICON[a.type] ? TACHO_ICON[a.type](13, ACT[a.type]?.color||'#fff') : ACT[a.type]?.icon} {fmtDur(a.end-a.start)}
                   </span>
                 ))}
               </div>
