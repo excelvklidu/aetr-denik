@@ -3,35 +3,39 @@ import { useState, useEffect } from 'react'
 
 // ─── TACHOGRAPH SVG ICONS (EU Reg. 561/2006) ─────────────────────────────────
 function IconDrive({ size=20, color='currentColor' }) {
-  // Steering wheel: outer ring + inner half-circle + center dot
+  // Steering wheel: outer ring + center hub + three spokes
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="9" />
       <circle cx="12" cy="12" r="2.5" fill={color} stroke="none" />
-      <path d="M12 9.5 A4.5 4.5 0 0 0 7.5 12" />
-      <path d="M12 9.5 A4.5 4.5 0 0 1 16.5 12" />
+      <line x1="9.5" y1="12" x2="3" y2="12" />
+      <line x1="14.5" y1="12" x2="21" y2="12" />
       <line x1="12" y1="14.5" x2="12" y2="21" />
     </svg>
   )
 }
 
 function IconWork({ size=20, color='currentColor' }) {
-  // Two crossed hammers (like the image)
+  // Two crossed hammers: diagonal handles with perpendicular heads
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-      <path d="M3 3 L8 8 L6.5 9.5 L9.5 12.5 L11 11 L13 13 L11.5 14.5 L14.5 17.5 L16 16 L21 21 L19 21 L14.5 16.5 L13 18 L10 15 L11.5 13.5 L8.5 10.5 L7 12 L4 9 L5.5 7.5 L3 5 Z" />
-      <path d="M21 3 L16 8 L17.5 9.5 L14.5 12.5 L13 11 L11 13 L12.5 14.5 L9.5 17.5 L8 16 L3 21 L5 21 L9.5 16.5 L11 18 L14 15 L12.5 13.5 L15.5 10.5 L17 12 L20 9 L18.5 7.5 L21 5 Z" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}>
+      <line x1="4" y1="20" x2="15.5" y2="8.5" strokeWidth="2.2" strokeLinecap="round" />
+      <line x1="20" y1="20" x2="8.5" y2="8.5" strokeWidth="2.2" strokeLinecap="round" />
+      <line x1="13" y1="4" x2="20" y2="11" strokeWidth="4" strokeLinecap="butt" />
+      <line x1="4" y1="11" x2="11" y2="4" strokeWidth="4" strokeLinecap="butt" />
     </svg>
   )
 }
 
 function IconRest({ size=20, color='currentColor' }) {
-  // Bed / rest symbol (like the image: horizontal bar with vertical legs)
+  // Bed: headboard, mattress, foot leg, pillow
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round">
-      <line x1="4" y1="8" x2="4" y2="17" />
-      <line x1="20" y1="8" x2="20" y2="17" />
-      <line x1="4" y1="13" x2="20" y2="13" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="3" y2="19" />
+      <line x1="3" y1="15" x2="21" y2="15" />
+      <line x1="21" y1="15" x2="21" y2="19" />
+      <path d="M10 15 V11 H19 A2 2 0 0 1 21 13 V15" />
+      <rect x="5" y="11" width="3.5" height="2.5" rx="1" fill={color} stroke="none" />
     </svg>
   )
 }
@@ -57,8 +61,8 @@ const TACHO_ICON = {
   fuel:      (s,c) => <IconWork size={s} color={c} />,
   other:     (s,c) => <IconWork size={s} color={c} />,
   vehicle:   (s,c) => <IconPOA size={s} color={c} />,
-  sick:      (s,c) => <span style={{fontSize:s*0.8}}>✕</span>,
-  vacation:  (s,c) => <span style={{fontSize:s*0.8}}>○</span>,
+  sick:      (s,c) => <span style={{fontSize:s*0.8, color:c}}>✕</span>,
+  vacation:  (s,c) => <span style={{fontSize:s*0.8, color:c}}>○</span>,
 }
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
