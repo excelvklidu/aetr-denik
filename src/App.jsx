@@ -1,5 +1,5 @@
 // AETR Deník v1.3 – localStorage (bez přihlášení) + tachograph SVG icons
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // ─── TACHOGRAPH SVG ICONS (EU Reg. 561/2006) ─────────────────────────────────
 function IconDrive({ size=20, color='currentColor' }) {
@@ -61,23 +61,23 @@ const TACHO_ICON = {
   fuel:      (s,c) => <IconWork size={s} color={c} />,
   other:     (s,c) => <IconWork size={s} color={c} />,
   vehicle:   (s,c) => <IconPOA size={s} color={c} />,
-  sick:      (s,c) => <span style={{fontSize:s*0.8, color:c}}>✕</span>,
-  vacation:  (s,c) => <span style={{fontSize:s*0.8, color:c}}>○</span>,
+  sick:      (s,c) => <span style={{fontSize:s*0.8, color:c, width:s, textAlign:'center', display:'inline-block', lineHeight:1}}>✕</span>,
+  vacation:  (s,c) => <span style={{fontSize:s*0.8, color:c, width:s, textAlign:'center', display:'inline-block', lineHeight:1}}>○</span>,
 }
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const ACT = {
-  drive:    { label: 'Řízení',           icon: '🚗', color: '#3B82F6', sym: '🚗', tacho: true  },
-  break:    { label: 'Přestávka',        icon: '🛏', color: '#F59E0B', sym: '🛏', tacho: true  },
-  rest:     { label: 'Odpočinek',        icon: '🛏', color: '#10B981', sym: '🛏', tacho: true  },
-  available:{ label: 'Dostupnost (POA)', icon: '⧄',  color: '#64748B', sym: '⧄',  tacho: true  },
-  load:     { label: 'Nakládka',         icon: '⚒',  color: '#8B5CF6', sym: '⚒',  tacho: true  },
-  unload:   { label: 'Vykládka',         icon: '⚒',  color: '#EC4899', sym: '⚒',  tacho: true  },
-  fuel:     { label: 'Tankování',        icon: '⚒',  color: '#F97316', sym: '⚒',  tacho: true  },
-  other:    { label: 'Jiná práce',       icon: '⚒',  color: '#6B7280', sym: '⚒',  tacho: true  },
-  vehicle:  { label: 'Přepřah',          icon: '⧄',  color: '#A78BFA', sym: '⧄',  tacho: true  },
-  sick:     { label: 'Nemoc/NV',         icon: '🏥', color: '#EF4444', sym: '✕',  tacho: false },
-  vacation: { label: 'Dovolená',         icon: '🌴', color: '#06B6D4', sym: '○',  tacho: false },
+  drive:    { label: 'Řízení',            color: '#3B82F6', tacho: true  },
+  break:    { label: 'Přestávka',         color: '#F59E0B', tacho: true  },
+  rest:     { label: 'Odpočinek',         color: '#10B981', tacho: true  },
+  available:{ label: 'Dostupnost (POA)',  color: '#64748B', tacho: true  },
+  load:     { label: 'Nakládka',          color: '#8B5CF6', tacho: true  },
+  unload:   { label: 'Vykládka',          color: '#EC4899', tacho: true  },
+  fuel:     { label: 'Tankování',         color: '#F97316', tacho: true  },
+  other:    { label: 'Jiná práce',        color: '#6B7280', tacho: true  },
+  vehicle:  { label: 'Přepřah',           color: '#A78BFA', tacho: true  },
+  sick:     { label: 'Nemoc/NV',          color: '#EF4444', tacho: false },
+  vacation: { label: 'Dovolená',          color: '#06B6D4', tacho: false },
 }
 
 const DAYS_CS = ['Ne','Po','Út','St','Čt','Pá','So']
@@ -181,6 +181,46 @@ const S = {
   tag: (color) => ({ background: color+'33', color, borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 600 }),
 }
 
+// ─── ACTIVITY PICKER (custom dropdown – <option> can't render SVG) ──────────
+function ActivityPicker({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const esc = e => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
+  }, [open])
+
+  const cur = ACT[value]
+  return (
+    <div ref={ref} style={{ position:'relative', minWidth:0 }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ ...S.input, padding:'6px 8px', display:'flex', alignItems:'center', gap:8, cursor:'pointer', textAlign:'left' }}>
+        {TACHO_ICON[value](16, cur.color)}
+        <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cur.label}</span>
+        <span style={{ color:'#64748B', fontSize:10 }}>▼</span>
+      </button>
+      {open && (
+        <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, minWidth:200, zIndex:10,
+          background:'#1E293B', border:'1px solid #334155', borderRadius:8, padding:4, boxShadow:'0 8px 24px #00000066' }}>
+          {Object.entries(ACT).map(([k,v]) => (
+            <button key={k} type="button" onClick={() => { onChange(k); setOpen(false) }}
+              style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'7px 8px', border:'none', borderRadius:6,
+                background: k===value ? '#3B82F6' : 'transparent', color:'#E2E8F0', fontSize:14, cursor:'pointer', textAlign:'left' }}>
+              {TACHO_ICON[k](16, k===value ? '#fff' : v.color)}
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── SHIFT MODAL ─────────────────────────────────────────────────────────────
 function ShiftModal({ date, shift, onSave, onClose }) {
   const initial = shift?.activities || []
@@ -264,7 +304,7 @@ function ShiftModal({ date, shift, onSave, onClose }) {
         <div style={{ marginBottom:12 }}>
           {acts.map(a => (
             <div key={a.id} style={{ ...S.row, background:'#0F172A', borderRadius:8, padding:'8px 10px', marginBottom:6 }}>
-              <span style={{ display:'flex', alignItems:'center' }}>{TACHO_ICON[a.type] ? TACHO_ICON[a.type](20, ACT[a.type]?.color||'#fff') : ACT[a.type]?.icon}</span>
+              <span style={{ display:'flex', alignItems:'center' }}>{TACHO_ICON[a.type]?.(20, ACT[a.type]?.color||'#fff')}</span>
               <span style={{ flex:1, fontSize:13 }}>{ACT[a.type]?.label}</span>
               <span style={{ color:'#94A3B8', fontSize:13 }}>{fmtTime(a.start)}–{fmtTime(a.end)}</span>
               <span style={{ color:'#60A5FA', fontSize:12, marginLeft:8 }}>{fmtDur(a.end-a.start)}</span>
@@ -277,9 +317,7 @@ function ShiftModal({ date, shift, onSave, onClose }) {
         <div style={{ background:'#0F172A', borderRadius:10, padding:12, marginBottom:12 }}>
           <div style={{ fontSize:13, fontWeight:600, marginBottom:8, color:'#94A3B8' }}>Přidat aktivitu</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', gap:6, alignItems:'center' }}>
-            <select style={{ ...S.input, padding:'6px 8px' }} value={newType} onChange={e=>setNewType(e.target.value)}>
-              {Object.entries(ACT).map(([k,v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
-            </select>
+            <ActivityPicker value={newType} onChange={setNewType} />
             <input style={{ ...S.input, width:80 }} type="time" value={newStart} onChange={e=>setNewStart(e.target.value)} />
             <input style={{ ...S.input, width:80 }} type="time" value={newEnd} onChange={e=>setNewEnd(e.target.value)} />
             <button onClick={addAct} style={S.btn('primary')}>+</button>
@@ -334,7 +372,7 @@ function WeekView({ shifts, weekStart, onDayClick }) {
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {(shift.activities||[]).map((a,i) => (
                   <span key={i} style={{ ...S.tag(ACT[a.type]?.color||'#666'), fontSize:11, display:'flex', alignItems:'center', gap:3 }}>
-                    {TACHO_ICON[a.type] ? TACHO_ICON[a.type](13, ACT[a.type]?.color||'#fff') : ACT[a.type]?.icon} {fmtDur(a.end-a.start)}
+                    {TACHO_ICON[a.type]?.(13, ACT[a.type]?.color||'#fff')} {fmtDur(a.end-a.start)}
                   </span>
                 ))}
               </div>
