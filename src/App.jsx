@@ -50,6 +50,18 @@ function IconPOA({ size=20, color='currentColor' }) {
   )
 }
 
+function IconFuel({ size=20, color='currentColor' }) {
+  // Fuel pump: body with display window, hose and nozzle
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 21 V5 A2 2 0 0 1 6 3 H12 A2 2 0 0 1 14 5 V21" />
+      <line x1="2.5" y1="21" x2="15.5" y2="21" />
+      <rect x="6.5" y="6" width="5" height="4" rx="0.5" fill={color} stroke="none" />
+      <path d="M14 12 H16 A1.5 1.5 0 0 1 17.5 13.5 V17 A1.75 1.75 0 0 0 21 17 V9 L18 6" />
+    </svg>
+  )
+}
+
 // SVG icon component lookup
 const TACHO_ICON = {
   drive:     (s,c) => <IconDrive size={s} color={c} />,
@@ -58,7 +70,7 @@ const TACHO_ICON = {
   available: (s,c) => <IconPOA size={s} color={c} />,
   load:      (s,c) => <IconWork size={s} color={c} />,
   unload:    (s,c) => <IconWork size={s} color={c} />,
-  fuel:      (s,c) => <IconWork size={s} color={c} />,
+  fuel:      (s,c) => <IconFuel size={s} color={c} />,
   other:     (s,c) => <IconWork size={s} color={c} />,
   vehicle:   (s,c) => <IconPOA size={s} color={c} />,
   sick:      (s,c) => <span style={{fontSize:s*0.8, color:c, width:s, textAlign:'center', display:'inline-block', lineHeight:1}}>✕</span>,
@@ -316,10 +328,10 @@ function ShiftModal({ date, shift, onSave, onClose }) {
         {/* Add activity */}
         <div style={{ background:'#0F172A', borderRadius:10, padding:12, marginBottom:12 }}>
           <div style={{ fontSize:13, fontWeight:600, marginBottom:8, color:'#94A3B8' }}>Přidat aktivitu</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', gap:6, alignItems:'center' }}>
-            <ActivityPicker value={newType} onChange={setNewType} />
-            <input style={{ ...S.input, width:80 }} type="time" value={newStart} onChange={e=>setNewStart(e.target.value)} />
-            <input style={{ ...S.input, width:80 }} type="time" value={newEnd} onChange={e=>setNewEnd(e.target.value)} />
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center' }}>
+            <div style={{ flex:'1 1 100%', minWidth:0 }}><ActivityPicker value={newType} onChange={setNewType} /></div>
+            <input style={{ ...S.input, width:90, flex:'1 0 90px' }} type="time" value={newStart} onChange={e=>setNewStart(e.target.value)} />
+            <input style={{ ...S.input, width:90, flex:'1 0 90px' }} type="time" value={newEnd} onChange={e=>setNewEnd(e.target.value)} />
             <button onClick={addAct} style={S.btn('primary')}>+</button>
           </div>
         </div>
