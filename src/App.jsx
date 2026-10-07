@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from './supabaseClient'
+// AETR Deník v1.2 – localStorage (bez přihlášení)
+import { useState, useEffect } from 'react'
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 // Tachograph symbols per EU standard 561/2006:
@@ -20,6 +20,7 @@ const ACT = {
 
 const DAYS_CS = ['Ne','Po','Út','St','Čt','Pá','So']
 const MONTHS_CS = ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']
+const LS_KEY = 'aetr_shifts'
 
 function toMin(h, m) { return h * 60 + m }
 function fmtDur(mins) {
@@ -35,6 +36,13 @@ function dateStr(d) {
 function parseDate(s) {
   const [y,m,d] = s.split('-').map(Number)
   return new Date(y, m-1, d)
+}
+
+function loadFromLS() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}') } catch { return {} }
+}
+function saveToLS(shifts) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(shifts)) } catch {}
 }
 
 function calcShiftMetrics(acts) {
@@ -53,7 +61,7 @@ function calcShiftMetrics(acts) {
 // AETR calculation over last 7 days
 function calcAETR(shifts7) {
   let weekDrive = 0, weekWork = 0
-  let lastRestStart = null, lastRestDur = 0
+  let lastRestDur = 0
   let contDrive = 0, contDriveMax = 0
   let splitBreakParts = []
 
@@ -74,7 +82,7 @@ function calcAETR(shifts7) {
           contDrive = 0; splitBreakParts = []
         }
       } else if (a.type === 'rest') {
-        lastRestStart = shift.date; lastRestDur = dur
+        lastRestDur = dur
         contDrive = 0; splitBreakParts = []
       }
     }
@@ -109,67 +117,6 @@ const S = {
   row: { display: 'flex', gap: 8, alignItems: 'center' },
   label: { color: '#94A3B8', fontSize: 12, marginBottom: 4 },
   tag: (color) => ({ background: color+'33', color, borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 600 }),
-}
-
-// ─── AUTH SCREEN ─────────────────────────────────────────────────────────────
-function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState('login')
-  const [email, setEmail] = useState('')
-  const [pass, setPass] = useState('')
-  const [err, setErr] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [ok, setOk] = useState('')
-
-  async function submit(e) {
-    e.preventDefault()
-    setErr(''); setLoading(true)
-    try {
-      if (mode === 'login') {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass })
-        if (error) throw error
-        onAuth(data.user)
-      } else {
-        const { error } = await supabase.auth.signUp({ email, password: pass })
-        if (error) throw error
-        setOk('Zkontroluj email — pošleme ti potvrzovací odkaz.')
-      }
-    } catch(e) { setErr(e.message) }
-    setLoading(false)
-  }
-
-  return (
-    <div style={{ ...S.app, display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={{ ...S.card, width: 360, padding: 32 }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>🚛</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#60A5FA' }}>AETR Deník</div>
-          <div style={{ color: '#64748B', fontSize: 13 }}>Záznamník řidiče</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          {['login','register'].map(m => (
-            <button key={m} onClick={()=>setMode(m)} style={{ ...S.btn(mode===m?'primary':'ghost'), flex:1 }}>
-              {m==='login'?'Přihlásit':'Registrovat'}
-            </button>
-          ))}
-        </div>
-        {ok ? <div style={{ color:'#10B981', background:'#10B98122', padding:12, borderRadius:8, marginBottom:12 }}>{ok}</div> : null}
-        {err ? <div style={{ color:'#EF4444', background:'#EF444422', padding:12, borderRadius:8, marginBottom:12 }}>{err}</div> : null}
-        <form onSubmit={submit}>
-          <div style={{ marginBottom: 12 }}>
-            <div style={S.label}>Email</div>
-            <input style={S.input} type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="jan@firma.cz" />
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <div style={S.label}>Heslo</div>
-            <input style={S.input} type="password" value={pass} onChange={e=>setPass(e.target.value)} required placeholder="min. 6 znaků" minLength={6} />
-          </div>
-          <button type="submit" style={{ ...S.btn('primary'), width:'100%', padding: '10px 0' }} disabled={loading}>
-            {loading ? '...' : mode==='login' ? 'Přihlásit se' : 'Vytvořit účet'}
-          </button>
-        </form>
-      </div>
-    </div>
-  )
 }
 
 // ─── SHIFT MODAL ─────────────────────────────────────────────────────────────
@@ -335,18 +282,18 @@ function WeekView({ shifts, weekStart, onDayClick }) {
 function AETRDash({ shifts }) {
   const sorted = Object.entries(shifts).sort((a,b) => a[0].localeCompare(b[0]))
   const last7 = sorted.slice(-7).map(([,s]) => s)
-  const aetр = calcAETR(last7)
-  const weekPct = Math.min(100, Math.round(aetр.weekDrive / (56*60) * 100))
+  const aetr = calcAETR(last7)
+  const weekPct = Math.min(100, Math.round(aetr.weekDrive / (56*60) * 100))
 
   return (
     <div style={S.card}>
       <div style={{ fontWeight:700, marginBottom:12 }}>📊 Přehled AETR (posl. 7 dní)</div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
         {[
-          ['Týdenní řízení', fmtDur(aetр.weekDrive), '/ 56h', aetр.weekDrive > 50*60 ? '#EF4444' : '#10B981'],
-          ['Max. nepřetržité', fmtDur(aetр.contDriveMax), '/ 4,5h', aetр.contDriveMax > 4*60 ? '#F59E0B' : '#10B981'],
-          ['Zbývá řídit', fmtDur(aetр.driveLeft), 'tento týden', '#60A5FA'],
-          ['Týdenní práce', fmtDur(aetр.weekWork), 'celkem', '#8B5CF6'],
+          ['Týdenní řízení', fmtDur(aetr.weekDrive), '/ 56h', aetr.weekDrive > 50*60 ? '#EF4444' : '#10B981'],
+          ['Max. nepřetržité', fmtDur(aetr.contDriveMax), '/ 4,5h', aetr.contDriveMax > 4*60 ? '#F59E0B' : '#10B981'],
+          ['Zbývá řídit', fmtDur(aetr.driveLeft), 'tento týden', '#60A5FA'],
+          ['Týdenní práce', fmtDur(aetr.weekWork), 'celkem', '#8B5CF6'],
         ].map(([l,v,s,c]) => (
           <div key={l} style={{ background:'#0F172A', borderRadius:10, padding:'10px 12px' }}>
             <div style={{ fontSize:11, color:'#64748B' }}>{l}</div>
@@ -356,7 +303,7 @@ function AETRDash({ shifts }) {
         ))}
       </div>
       {/* Progress bar */}
-      <div style={{ marginBottom: aetр.alerts.length?12:0 }}>
+      <div style={{ marginBottom: aetr.alerts.length?12:0 }}>
         <div style={{ ...S.row, justifyContent:'space-between', marginBottom:4 }}>
           <div style={{ fontSize:12, color:'#94A3B8' }}>Týdenní řízení</div>
           <div style={{ fontSize:12, color:'#94A3B8' }}>{weekPct}%</div>
@@ -365,7 +312,7 @@ function AETRDash({ shifts }) {
           <div style={{ width:`${weekPct}%`, height:'100%', background: weekPct>90?'#EF4444':weekPct>75?'#F59E0B':'#10B981', transition:'width 0.4s' }} />
         </div>
       </div>
-      {aetр.alerts.map((a,i) => (
+      {aetr.alerts.map((a,i) => (
         <div key={i} style={{ background: a.lvl==='err'?'#EF444422':'#F59E0B22', border:`1px solid ${a.lvl==='err'?'#EF4444':'#F59E0B'}44`, borderRadius:8, padding:'8px 12px', marginBottom:6, fontSize:13, color: a.lvl==='err'?'#FCA5A5':'#FCD34D' }}>
           {a.lvl==='err'?'🔴':'🟡'} {a.msg}
         </div>
@@ -393,90 +340,27 @@ function exportCSV(shifts) {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [shifts, setShifts] = useState({})  // { 'YYYY-MM-DD': shift }
+  const [shifts, setShifts] = useState(() => loadFromLS())
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d
   })
-  const [modal, setModal] = useState(null)  // { date, shift }
+  const [modal, setModal] = useState(null)
   const [tab, setTab] = useState('week')
-  const [syncing, setSyncing] = useState(false)
 
-  // Auth listener
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user || null)
-      setLoading(false)
-    })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user || null)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
-
-  // Load shifts from Supabase
-  useEffect(() => {
-    if (!user) return
-    loadShifts()
-  }, [user])
-
-  async function loadShifts() {
-    setSyncing(true)
-    const { data, error } = await supabase.from('shifts').select('*').eq('user_id', user.id)
-    if (!error && data) {
-      const map = {}
-      for (const s of data) map[s.date] = s
-      setShifts(map)
-    }
-    setSyncing(false)
-  }
-
-  async function saveShift(shiftData) {
-    const existing = shifts[shiftData.date]
-    setSyncing(true)
-    if (existing?.id) {
-      const { error } = await supabase.from('shifts').update({
-        activities: shiftData.activities,
-        vehicle_reg: shiftData.vehicle_reg,
-        cycle_type: shiftData.cycle_type,
-        notes: shiftData.notes,
-        updated_at: new Date().toISOString()
-      }).eq('id', existing.id)
-      if (!error) {
-        setShifts(prev => ({ ...prev, [shiftData.date]: { ...existing, ...shiftData } }))
-      }
-    } else {
-      const { data, error } = await supabase.from('shifts').insert({
-        user_id: user.id,
-        date: shiftData.date,
-        activities: shiftData.activities,
-        vehicle_reg: shiftData.vehicle_reg,
-        cycle_type: shiftData.cycle_type,
-        notes: shiftData.notes,
-      }).select().single()
-      if (!error && data) {
-        setShifts(prev => ({ ...prev, [shiftData.date]: data }))
-      }
-    }
-    setSyncing(false)
+  function saveShift(shiftData) {
+    const updated = { ...shifts, [shiftData.date]: shiftData }
+    setShifts(updated)
+    saveToLS(updated)
     setModal(null)
   }
 
-  async function deleteShift(date) {
-    const existing = shifts[date]
-    if (!existing?.id) { setModal(null); return }
-    setSyncing(true)
-    await supabase.from('shifts').delete().eq('id', existing.id)
-    setShifts(prev => { const n = {...prev}; delete n[date]; return n })
-    setSyncing(false)
+  function deleteShift(date) {
+    const updated = { ...shifts }
+    delete updated[date]
+    setShifts(updated)
+    saveToLS(updated)
     setModal(null)
   }
-
-  function signOut() { supabase.auth.signOut() }
-
-  if (loading) return <div style={{ ...S.app, display:'flex', alignItems:'center', justifyContent:'center' }}>⏳ Načítám...</div>
-  if (!user) return <AuthScreen onAuth={setUser} />
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart); d.setDate(d.getDate() + i); return dateStr(d)
@@ -487,17 +371,14 @@ export default function App() {
       {/* Header */}
       <div style={S.header}>
         <div style={S.logo}>🚛 AETR Deník</div>
-        {syncing && <span style={{ color:'#60A5FA', fontSize:12 }}>⟳ sync</span>}
-        <div style={{ marginLeft:'auto', ...S.row, gap:8 }}>
-          <span style={{ color:'#64748B', fontSize:12 }}>{user.email}</span>
+        <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
           <button onClick={() => exportCSV(shifts)} style={S.btn('green')}>⬇ CSV</button>
-          <button onClick={signOut} style={S.btn('ghost')}>Odhlásit</button>
         </div>
       </div>
 
       {/* Tabs */}
       <div style={{ display:'flex', gap:0, background:'#1E293B', borderBottom:'1px solid #334155', padding:'0 16px' }}>
-        {[['week','📅 Týden'],['aetр','📊 AETR']].map(([k,l]) => (
+        {[['week','📅 Týden'],['aetr','📊 AETR']].map(([k,l]) => (
           <button key={k} onClick={()=>setTab(k)} style={{
             padding:'10px 16px', background:'none', border:'none', cursor:'pointer',
             color: tab===k?'#60A5FA':'#64748B', fontWeight:600, fontSize:14,
@@ -525,7 +406,7 @@ export default function App() {
             />
           </>
         )}
-        {tab === 'aetр' && <AETRDash shifts={shifts} />}
+        {tab === 'aetr' && <AETRDash shifts={shifts} />}
       </div>
 
       {/* Modal */}
