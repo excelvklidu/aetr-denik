@@ -93,6 +93,7 @@ const ACT = {
 }
 
 const DAYS_CS = ['Ne','Po','Út','St','Čt','Pá','So']
+const MONTHS_NOM_CS = ['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec']
 const MONTHS_CS = ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']
 const LS_KEY = 'aetr_shifts'
 
@@ -233,6 +234,20 @@ function ActivityPicker({ value, onChange }) {
   )
 }
 
+// Break rule (561/2006 čl. 7): one break ≥ 45 min, or split 15 min + 30 min in this order.
+// Returns a warning text, or null when OK / no breaks recorded.
+function checkBreaks(acts) {
+  const breaks = acts.filter(a => a.type === 'break').sort((a,b) => a.start - b.start).map(a => a.end - a.start)
+  if (!breaks.length) return null
+  if (breaks.some(d => d >= 45)) return null
+  const firstOk = breaks.findIndex(d => d >= 15)
+  if (firstOk >= 0 && breaks.slice(firstOk + 1).some(d => d >= 30)) return null
+  const list = breaks.map(d => `${d} min`).join(' + ')
+  return breaks.length === 1
+    ? `Přestávka ${list} je kratší než 45 min. Dělená přestávka musí být 15 min + 30 min (v tomto pořadí).`
+    : `Dělená přestávka ${list} nesplňuje pravidlo: první část ≥ 15 min, druhá ≥ 30 min (nebo jedna ≥ 45 min).`
+}
+
 // ─── SHIFT MODAL ─────────────────────────────────────────────────────────────
 function ShiftModal({ date, shift, onSave, onClose }) {
   const initial = shift?.activities || []
@@ -243,6 +258,18 @@ function ShiftModal({ date, shift, onSave, onClose }) {
   const [newType, setNewType] = useState('drive')
   const [newStart, setNewStart] = useState('06:00')
   const [newEnd, setNewEnd] = useState('14:00')
+  const [cycleStart, setCycleStart] = useState(shift?.cycle_start || '00:00')
+  const [edit, setEdit] = useState(null)   // { id, type, start:'HH:MM', end:'HH:MM' }
+
+  function startEdit(a) { setEdit({ id: a.id, type: a.type, start: fmtTime(a.start), end: fmtTime(a.end) }) }
+  function confirmEdit() {
+    const [sh,sm] = edit.start.split(':').map(Number)
+    const [eh,em] = edit.end.split(':').map(Number)
+    const start = toMin(sh,sm), end = toMin(eh,em)
+    if (end <= start) return
+    setActs(acts.map(a => a.id === edit.id ? { ...a, type: edit.type, start, end } : a).sort((a,b) => a.start - b.start))
+    setEdit(null)
+  }
 
   function addAct() {
     const [sh,sm] = newStart.split(':').map(Number)
@@ -256,10 +283,11 @@ function ShiftModal({ date, shift, onSave, onClose }) {
   function removeAct(id) { setActs(acts.filter(a => a.id !== id)) }
 
   function save() {
-    onSave({ date, activities: acts, vehicle_reg: veh, cycle_type: cycle, notes })
+    onSave({ date, activities: acts, vehicle_reg: veh, cycle_type: cycle, cycle_start: cycleStart, notes })
   }
 
   const m = calcShiftMetrics(acts)
+  const breakWarn = checkBreaks(acts)
 
   return (
     <div style={{ position:'fixed', inset:0, background:'#00000088', zIndex:100, display:'flex', alignItems:'flex-start', justifyContent:'center', overflowY:'auto', padding: '20px 0' }}>
@@ -284,6 +312,10 @@ function ShiftModal({ date, shift, onSave, onClose }) {
               <option value="out">OUT (mimo pravidelnost)</option>
               <option value="bus">Autobusový</option>
             </select>
+          </div>
+          <div>
+            <div style={S.label}>Začátek cyklu (čas)</div>
+            <input style={S.input} type="time" value={cycleStart} onChange={e=>setCycleStart(e.target.value || '00:00')} />
           </div>
         </div>
 
@@ -314,16 +346,32 @@ function ShiftModal({ date, shift, onSave, onClose }) {
 
         {/* Activities list */}
         <div style={{ marginBottom:12 }}>
-          {acts.map(a => (
+          {acts.map(a => edit?.id === a.id ? (
+            <div key={a.id} style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', background:'#0F172A', border:'1px solid #3B82F6', borderRadius:8, padding:'8px 10px', marginBottom:6 }}>
+              <div style={{ flex:'1 1 100%', minWidth:0 }}><ActivityPicker value={edit.type} onChange={t=>setEdit({ ...edit, type:t })} /></div>
+              <input style={{ ...S.input, width:90, flex:'1 0 90px' }} type="time" value={edit.start} onChange={e=>setEdit({ ...edit, start:e.target.value })} />
+              <input style={{ ...S.input, width:90, flex:'1 0 90px' }} type="time" value={edit.end} onChange={e=>setEdit({ ...edit, end:e.target.value })} />
+              <button onClick={confirmEdit} title="Potvrdit" style={S.btn('green')}>✓</button>
+              <button onClick={()=>setEdit(null)} title="Zrušit úpravu" style={S.btn('ghost')}>↺</button>
+            </div>
+          ) : (
             <div key={a.id} style={{ ...S.row, background:'#0F172A', borderRadius:8, padding:'8px 10px', marginBottom:6 }}>
               <span style={{ display:'flex', alignItems:'center' }}>{TACHO_ICON[a.type]?.(20, ACT[a.type]?.color||'#fff')}</span>
               <span style={{ flex:1, fontSize:13 }}>{ACT[a.type]?.label}</span>
               <span style={{ color:'#94A3B8', fontSize:13 }}>{fmtTime(a.start)}–{fmtTime(a.end)}</span>
               <span style={{ color:'#60A5FA', fontSize:12, marginLeft:8 }}>{fmtDur(a.end-a.start)}</span>
-              <button onClick={()=>removeAct(a.id)} style={{ background:'none', border:'none', color:'#EF4444', cursor:'pointer', fontSize:16, marginLeft:6 }}>✕</button>
+              <button onClick={()=>startEdit(a)} title="Upravit" style={{ background:'none', border:'none', cursor:'pointer', fontSize:14, marginLeft:6 }}>✏️</button>
+              <button onClick={()=>removeAct(a.id)} title="Smazat" style={{ background:'none', border:'none', color:'#EF4444', cursor:'pointer', fontSize:16, marginLeft:2 }}>✕</button>
             </div>
           ))}
         </div>
+
+        {breakWarn && (
+          <div style={{ background:'#F59E0B22', border:'1px solid #F59E0B44', borderRadius:8, padding:10, marginBottom:12, fontSize:13, color:'#FCD34D', display:'flex', gap:6, alignItems:'flex-start' }}>
+            <span style={{ display:'flex', paddingTop:1 }}><IconRest size={16} color="#FCD34D" /></span>
+            <span>⚠️ {breakWarn}</span>
+          </div>
+        )}
 
         {/* Add activity */}
         <div style={{ background:'#0F172A', borderRadius:10, padding:12, marginBottom:12 }}>
@@ -399,6 +447,57 @@ function WeekView({ shifts, weekStart, onDayClick }) {
   )
 }
 
+// ─── MONTH VIEW ───────────────────────────────────────────────────────────────
+function MonthView({ shifts, monthStart, onDayClick }) {
+  const year = monthStart.getFullYear(), month = monthStart.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const lead = (new Date(year, month, 1).getDay() + 6) % 7   // Monday-first offset
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1))]
+  const today = dateStr(new Date())
+  const shortDur = min => `${Math.floor(min/60)}h${min%60 ? String(min%60).padStart(2,'0') : ''}`
+
+  return (
+    <div style={{ ...S.card, padding:10 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7, minmax(0,1fr))', gap:4 }}>
+        {['Po','Út','St','Čt','Pá','So','Ne'].map(d => (
+          <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:600, color:'#64748B', paddingBottom:4 }}>{d}</div>
+        ))}
+        {cells.map((d, i) => {
+          if (!d) return <div key={`e${i}`} />
+          const ds = dateStr(d)
+          const shift = shifts[ds]
+          const acts = shift?.activities || []
+          const m = acts.length ? calcShiftMetrics(acts) : null
+          const types = [...new Set(acts.map(a => a.type))]
+          const isToday = ds === today
+          const weekend = d.getDay() === 0 || d.getDay() === 6
+          return (
+            <div key={ds} onClick={() => onDayClick(ds, shift)}
+              style={{ background:'#0F172A', borderRadius:8, minHeight:64, padding:'4px 4px 5px', cursor:'pointer',
+                border: isToday ? '1px solid #3B82F6' : m && m.drive > 9*60 ? '1px solid #EF444488' : '1px solid transparent',
+                display:'flex', flexDirection:'column', gap:3, minWidth:0 }}>
+              <div style={{ fontSize:12, fontWeight: isToday?700:500, color: isToday ? '#60A5FA' : weekend ? '#64748B' : '#CBD5E1' }}>{d.getDate()}</div>
+              {m && (
+                <>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                    {types.map(t => <span key={t} style={{ display:'flex' }}>{TACHO_ICON[t]?.(11, ACT[t]?.color||'#fff')}</span>)}
+                  </div>
+                  {m.drive > 0 && (
+                    <div style={{ marginTop:'auto', fontSize:10, fontWeight:700, whiteSpace:'nowrap', overflow:'hidden',
+                      color: m.drive > 9*60 ? '#EF4444' : '#60A5FA', display:'flex', alignItems:'center', gap:2 }}>
+                      <IconDrive size={9} color={m.drive > 9*60 ? '#EF4444' : '#60A5FA'} />{shortDur(m.drive)}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── AETR DASHBOARD ───────────────────────────────────────────────────────────
 function AETRDash({ shifts }) {
   const sorted = Object.entries(shifts).sort((a,b) => a[0].localeCompare(b[0]))
@@ -465,6 +564,7 @@ export default function App() {
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d
   })
+  const [monthStart, setMonthStart] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
   const [modal, setModal] = useState(null)
   const [tab, setTab] = useState('week')
 
@@ -499,7 +599,7 @@ export default function App() {
 
       {/* Tabs */}
       <div style={{ display:'flex', gap:0, background:'#1E293B', borderBottom:'1px solid #334155', padding:'0 16px' }}>
-        {[['week','📅 Týden'],['aetr','📊 AETR']].map(([k,l]) => (
+        {[['week','📅 Týden'],['month','📆 Měsíc'],['aetr','📊 AETR']].map(([k,l]) => (
           <button key={k} onClick={()=>setTab(k)} style={{
             padding:'10px 16px', background:'none', border:'none', cursor:'pointer',
             color: tab===k?'#60A5FA':'#64748B', fontWeight:600, fontSize:14,
@@ -523,6 +623,23 @@ export default function App() {
             <WeekView
               shifts={shifts}
               weekStart={weekStart}
+              onDayClick={(date, shift) => setModal({ date, shift })}
+            />
+          </>
+        )}
+        {tab === 'month' && (
+          <>
+            {/* Month navigation */}
+            <div style={{ ...S.row, justifyContent:'space-between', marginBottom:12 }}>
+              <button onClick={()=>setMonthStart(new Date(monthStart.getFullYear(), monthStart.getMonth()-1, 1))} style={S.btn('ghost')}>‹ Předchozí</button>
+              <div style={{ fontWeight:600, fontSize:14, textTransform:'capitalize' }}>
+                {MONTHS_NOM_CS[monthStart.getMonth()]} {monthStart.getFullYear()}
+              </div>
+              <button onClick={()=>setMonthStart(new Date(monthStart.getFullYear(), monthStart.getMonth()+1, 1))} style={S.btn('ghost')}>Následující ›</button>
+            </div>
+            <MonthView
+              shifts={shifts}
+              monthStart={monthStart}
               onDayClick={(date, shift) => setModal({ date, shift })}
             />
           </>
